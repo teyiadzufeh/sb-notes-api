@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>The SB Library</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.21/vue.global.prod.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0e0e0e;
+      --surface: #161616;
+      --border: #2a2a2a;
+      --accent: #c8a96e;
+      --accent-dim: #c8a96e22;
+      --text: #e8e2d9;
+      --text-muted: #6b6560;
+      --danger: #e05a5a;
+      --danger-dim: #e05a5a18;
+      --success: #5aab8a;
+      --radius: 2px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    /* grain overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.4;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      grid-template-rows: auto 1fr;
+      min-height: 100vh;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      grid-column: 1 / -1;
+      padding: 48px 48px 32px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+    }
+
+    .header-left h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 3rem;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      color: var(--text);
+    }
+
+    .header-left h1 em {
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .header-meta {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-top: 8px;
+    }
+
+    .count-badge {
+      font-family: 'Playfair Display', serif;
+      font-size: 4rem;
+      font-weight: 400;
+      color: var(--border);
+      line-height: 1;
+      font-style: italic;
+    }
+
+    /* Main content */
+    .notes-panel {
+      padding: 40px 48px;
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+    }
+
+    .panel-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .panel-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Note list */
+    .note-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .note-item {
+      display: grid;
+      grid-template-columns: 32px 1fr auto;
+      align-items: center;
+      gap: 16px;
+      padding: 18px 20px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+      background: transparent;
+    }
+
+    .note-item:hover {
+      background: var(--surface);
+      border-color: var(--border);
+    }
+
+    .note-item.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+    }
+
+    .note-item.active .note-index {
+      color: var(--accent);
+    }
+
+    .note-index {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .note-info { min-width: 0; }
+
+    .note-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1rem;
+      font-weight: 400;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+    }
+
+    .note-author {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .note-actions {
+      display: flex;
+      gap: 8px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .note-item:hover .note-actions { opacity: 1; }
+
+    .btn-icon {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 0.75rem;
+    }
+
+    .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-icon.danger:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-dim); }
+
+    /* Empty state */
+    .empty {
+      padding: 64px 0;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      margin-bottom: 16px;
+      opacity: 0.3;
+    }
+
+    .empty p { font-size: 0.8rem; letter-spacing: 0.05em; }
+
+    /* Form panel */
+    .form-panel {
+      padding: 40px 36px;
+      background: var(--surface);
+    }
+
+    .form-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.4rem;
+      font-weight: 400;
+      margin-bottom: 32px;
+      color: var(--text);
+    }
+
+    .form-title span {
+      display: block;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+
+    .field {
+      margin-bottom: 24px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .field input, .field textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.85rem;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+      border-radius: var(--radius);
+    }
+
+    .field input:focus, .field textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .field textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    .field input::placeholder, .field textarea::placeholder {
+      color: var(--text-muted);
+      opacity: 0.5;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 32px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s;
+      border-radius: var(--radius);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #0e0e0e;
+    }
+
+    .btn-primary:hover { opacity: 0.85; }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--text-muted);
+    }
+
+    .btn-ghost:hover { border-color: var(--text-muted); color: var(--text); }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 32px;
+      right: 32px;
+      padding: 12px 20px;
+      background: var(--surface);
+      border: 1px solid var(--success);
+      color: var(--success);
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      z-index: 1000;
+      animation: slideUp 0.2s ease;
+    }
+
+    .toast.error { border-color: var(--danger); color: var(--danger); }
+
+    @keyframes slideUp {
+      from { transform: translateY(10px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Confirm dialog */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: #0e0e0ecc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      backdrop-filter: blur(4px);
+    }
+
+    .dialog {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 36px;
+      width: 340px;
+    }
+
+    .dialog h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.2rem;
+      font-weight: 400;
+      margin-bottom: 10px;
+    }
+
+    .dialog p {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+      line-height: 1.6;
+    }
+
+    .dialog-actions { display: flex; gap: 10px; }
+
+    .btn-danger {
+      flex: 1;
+      padding: 11px;
+      background: var(--danger-dim);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-danger:hover { background: var(--danger); color: #fff; }
+
+    @media (max-width: 768px) {
+      .layout { grid-template-columns: 1fr; }
+      header { padding: 32px 24px 24px; }
+      .notes-panel { padding: 28px 24px; border-right: none; border-bottom: 1px solid var(--border); }
+      .form-panel { padding: 28px 24px; }
+      .count-badge { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="layout">
+    <!-- Header -->
+    <header>
+      <div class="header-left">
+        <h1>The SB <em>Library</em></h1>
+        <p class="header-meta">Personal note collection</p>
+      </div>
+      <div class="count-badge">{{ notes.length.toString().padStart(2, '0') }}</div>
+    </header>
+
+    <!-- Notes List -->
+    <main class="notes-panel">
+      <p class="panel-label">Collection</p>
+
+      <div v-if="notes.length === 0" class="empty">
+        <div class="empty-icon">◎</div>
+        <p>No notes yet. Add your first one.</p>
+      </div>
+
+      <div v-else class="note-list">
+        <div
+          v-for="(note, i) in notes"
+          :key="note.id"
+          class="note-item"
+          :class="{ active: editingNote?.id === note.id }"
+          @click="selectNote(note)"
+        >
+          <span class="note-index">{{ String(i + 1).padStart(2, '0') }}</span>
+          <div class="note-info">
+            <div class="note-title">{{ note.title }}</div>
+            <!-- <div class="note-author">{{ note.author || '—' }}</div> -->
+          </div>
+          <div class="note-actions" @click.stop>
+            <button class="btn-icon" @click="selectNote(note)" title="Edit">✎</button>
+            <button class="btn-icon danger" @click="confirmDelete(note)" title="Delete">✕</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Form Panel -->
+    <aside class="form-panel">
+      <div class="form-title">
+        <span>{{ editingNote ? 'Editing' : 'New entry' }}</span>
+        {{ editingNote ? editingNote.title : 'Add a note' }}
+      </div>
+
+      <div class="field">
+        <label>Title *</label>
+        <input v-model="form.title" placeholder="Note title" />
+      </div>
+
+      <!-- <div class="field">
+        <label>Author</label>
+        <input v-model="form.author" placeholder="Author name" />
+      </div> -->
+
+      <div class="field">
+        <label>content</label>
+        <textarea v-model="form.content" placeholder="Your thoughts..."></textarea>
+      </div>
+
+      <div class="form-actions">
+        <button v-if="editingNote" class="btn btn-ghost" @click="resetForm">Cancel</button>
+        <button class="btn btn-primary" @click="submitForm" :disabled="!form.title.trim()">
+          {{ editingNote ? 'Save changes' : 'Add note' }}
+        </button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Delete Confirm Dialog -->
+  <div v-if="deletingNote" class="overlay" @click.self="deletingNote = null">
+    <div class="dialog">
+      <h3>Remove note?</h3>
+      <p>
+        "<strong>{{ deletingNote.title }}</strong>" will be permanently removed from your collection.
+      </p>
+      <div class="dialog-actions">
+        <button class="btn btn-ghost" style="flex:1; padding:11px;" @click="deletingNote = null">Cancel</button>
+        <button class="btn-danger" @click="deleteNote">Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div v-if="toast.show" class="toast" :class="{ error: toast.error }">
+    {{ toast.message }}
+  </div>
+</div>
+
+<script>
+const { createApp, ref, reactive } = Vue;
+
+const API_BASE = 'http://localhost:3000/api';
+
+// Replace with your actual token storage logic
+function getToken() {
+  return localStorage.getItem('token') || '';
+}
+
+async function apiFetch(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${getToken()}`,
+      ...options.headers,
+    },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+createApp({
+  setup() {
+    const notes = ref([]);
+    const editingNote = ref(null);
+    const deletingNote = ref(null);
+    const toast = reactive({ show: false, message: '', error: false });
+
+    // const form = reactive({ title: '', author: '', content: '' });
+    const form = reactive({ title: '', content: '' });
+
+    function showToast(message, error = false) {
+      toast.message = message;
+      toast.error = error;
+      toast.show = true;
+      setTimeout(() => toast.show = false, 2500);
+    }
+
+    async function fetchNotes() {
+      try {
+        notes.value = await apiFetch('/notes');
+      } catch {
+        // Seed mock data for UI preview
+        notes.value = [
+        //   { id: 1, title: 'Dune', author: 'Frank Herbert', content: '' },
+          { id: 1, title: 'Dune', content: 'Fresh like mad' },
+          { id: 2, title: 'The Glory of the Lord', content: 'Is tangible' },
+          { id: 3, title: 'Water', content: 'Gate from Ezra' },
+        ];
+      }
+    }
+
+    function selectNote(note) {
+      editingNote.value = note;
+      form.title = note.title;
+    //   form.author = note.author || '';
+      form.content = note.content || '';
+    }
+
+    function resetForm() {
+      editingNote.value = null;
+      form.title = '';
+    //   form.author = '';
+      form.content = '';
+    }
+
+    async function submitForm() {
+      if (!form.title.trim()) return;
+    //   const body = JSON.stringify({ title: form.title, author: form.author, content: form.content });
+      const body = JSON.stringify({ title: form.title, content: form.content });
+
+      try {
+        if (editingNote.value) {
+          const updated = await apiFetch(`/notes/${editingNote.value.id}`, { method: 'PUT', body });
+          const idx = notes.value.findIndex(b => b.id === updated.id);
+          if (idx !== -1) notes.value[idx] = updated;
+          showToast('Note updated');
+        } else {
+          const created = await apiFetch('/notes', { method: 'POST', body });
+          notes.value.push(created);
+          showToast('Note added');
+        }
+        resetForm();
+      } catch {
+        // Optimistic UI fallback for preview
+        if (editingNote.value) {
+          const idx = notes.value.findIndex(b => b.id === editingNote.value.id);
+          if (idx !== -1) notes.value[idx] = { ...editingNote.value, ...form };
+          showToast('Note updated');
+        } else {
+        //   notes.value.push({ id: Date.now(), title: form.title, author: form.author, content: form.content });
+          notes.value.push({ id: Date.now(), title: form.title, content: form.content });
+          showToast('Note added');
+        }
+        resetForm();
+      }
+    }
+
+    function confirmDelete(note) {
+      deletingNote.value = note;
+    }
+
+    async function deleteNote() {
+      try {
+        await apiFetch(`/notes/${deletingNote.value.id}`, { method: 'DELETE' });
+      } catch { /* fallback */ }
+      notes.value = notes.value.filter(b => b.id !== deletingNote.value.id);
+      if (editingNote.value?.id === deletingNote.value.id) resetForm();
+      showToast('Note removed');
+      deletingNote.value = null;
+    }
+
+    fetchNotes();
+
+    return { notes, form, editingNote, deletingNote, toast, selectNote, resetForm, submitForm, confirmDelete, deleteNote };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
